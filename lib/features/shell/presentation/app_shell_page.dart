@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../../dashboard/presentation/dashboard_page.dart';
+import '../../daily_accomplishment/presentation/daily_accomplishment_page.dart';
 
 class AppShellPage extends StatefulWidget {
   const AppShellPage({super.key});
@@ -101,8 +104,10 @@ class _AppShellPageState extends State<AppShellPage> {
             ),
           ),
 
+          _buildExitButton(),
+
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: Text(
               'Version 0.1.0',
               style: TextStyle(
@@ -193,6 +198,35 @@ class _AppShellPageState extends State<AppShellPage> {
     );
   }
 
+  Widget _buildExitButton() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Material(
+        color: Colors.transparent,
+        child: ListTile(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          leading: Icon(
+            Icons.exit_to_app_outlined,
+            color: Colors.grey.shade700,
+          ),
+          title: Text(
+            'Exit',
+            style: TextStyle(
+              color: Colors.grey.shade800,
+            ),
+          ),
+          onTap: _exitApplication,
+        ),
+      ),
+    );
+  }
+
+  void _exitApplication() {
+    exit(0);
+  }
+
   Widget _buildTopBar() {
     return Container(
       height: 72,
@@ -238,10 +272,7 @@ class _AppShellPageState extends State<AppShellPage> {
         return const DashboardPage();
 
       case 1:
-        return const _ComingSoonPage(
-          title: 'Daily Accomplishment',
-          icon: Icons.calendar_month_outlined,
-        );
+        return const DailyAccomplishmentPage();
 
       case 2:
         return const _ComingSoonPage(

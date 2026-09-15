@@ -75,18 +75,22 @@ class CalendarWidget extends StatelessWidget {
           _buildWeekdayHeader(),
           const SizedBox(height: 12),
           Expanded(
-            child: GridView.builder(
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: cells.length,
-              gridDelegate:
-                  const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 7,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
+            child: Scrollbar(
+              thumbVisibility: true,
+              child: GridView.builder(
+                padding: const EdgeInsets.only(right: 8),
+                itemCount: cells.length,
+                gridDelegate:
+                    const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 7,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                  childAspectRatio: 1.0,
+                ),
+                itemBuilder: (context, index) {
+                  return cells[index];
+                },
               ),
-              itemBuilder: (context, index) {
-                return cells[index];
-              },
             ),
           ),
         ],
