@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../data/daily_accomplishment_repository.dart';
+
 import 'calendar_widget.dart';
+import 'day_entry_page.dart';
 
 class DailyAccomplishmentPage extends StatefulWidget {
   const DailyAccomplishmentPage({super.key});
@@ -14,6 +17,36 @@ class _DailyAccomplishmentPageState
     extends State<DailyAccomplishmentPage> {
   DateTime _displayedMonth = DateTime(2026, 9);
 
+  Set<DateTime> _completedDates = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCompletedDates();
+  }
+
+  Future<void> _loadCompletedDates() async {
+    final records =
+        await dailyAccomplishmentRepository.getMonth(
+      _displayedMonth.year,
+      _displayedMonth.month,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _completedDates = records
+          .map(
+            (record) => DateTime(
+              record.date.year,
+              record.date.month,
+              record.date.day,
+            ),
+          )
+          .toSet();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -24,10 +57,12 @@ class _DailyAccomplishmentPageState
           _buildHeader(),
           const SizedBox(height: 24),
           Expanded(
-            child: CalendarWidget(
-              month: _displayedMonth,
-              onDateSelected: _handleDateSelected,
-            ),
+            child:CalendarWidget(
+                    
+                    month: _displayedMonth,
+                    completedDates: _completedDates,                    
+                    onDateSelected: _handleDateSelected,
+                  ),
           ),
         ],
       ),
@@ -111,17 +146,17 @@ class _DailyAccomplishmentPageState
     });
   }
 
-  void _handleDateSelected(DateTime date) {
+  Future<void> _handleDateSelected(DateTime date) async {
     final bool isWeekend =
         date.weekday == DateTime.saturday ||
         date.weekday == DateTime.sunday;
 
     if (isWeekend) {
-      _showWeekendWorkDialog(date);
+      await _showWeekendWorkDialog(date);
       return;
     }
 
-    _openDayEntry(date);
+    await _openDayEntry(date);
   }
 
   Future<void> _showWeekendWorkDialog(DateTime date) async {
@@ -155,29 +190,133 @@ class _DailyAccomplishmentPageState
       return;
     }
 
-    _openDayEntry(date);
+    await _openDayEntry(date);
   }
 
-  void _openDayEntry(DateTime date) {
-    showDialog<void>(
+  Future<void> _openDayEntry(DateTime date) async {
+    final existingRecord =
+        await dailyAccomplishmentRepository.get(date);
+
+    if (!mounted) return;
+
+    // -------------------------------------------------------------------------
+    // No existing record = new entry
+    // -------------------------------------------------------------------------
+
+    if (existingRecord == null) {
+      final bool? saved = await showDialog<bool>(
+        context: context,
+        builder: (context) {
+          return Dialog(
+            insetPadding: const EdgeInsets.all(24),
+            child: SizedBox(
+              width: 900,
+              height: 700,
+              child: DayEntryPage(
+                date: date,
+                record: null,
+                readOnly: false,
+              ),
+            ),
+          );
+        },
+      );
+
+      if (!mounted || saved != true) {
+        return;
+      }
+      await _loadCompletedDates();
+      return;
+    }
+
+    // -------------------------------------------------------------------------
+    // Existing record = ask whether to edit
+    // -------------------------------------------------------------------------
+
+    final bool? edit = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Daily Accomplishment'),
-          content: Text(
-            'Selected date: ${_formattedDate(date)}',
+          title: const Text(
+            'Daily Accomplishment Already Encoded',
+          ),
+          content: const Text(
+            'This Daily Accomplishment has already been encoded.\n\n'
+            'Do you want to edit this entry?',
           ),
           actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(false);
+              },
+              child: const Text('No'),
+            ),
             FilledButton(
               onPressed: () {
-                Navigator.of(context).pop();
+                Navigator.of(context).pop(true);
               },
-              child: const Text('Close'),
+              child: const Text('Yes'),
             ),
           ],
         );
       },
     );
+
+    if (!mounted) return;
+
+    // -------------------------------------------------------------------------
+    // No = View Mode
+    // -------------------------------------------------------------------------
+
+    if (edit != true) {
+      await showDialog<void>(
+        context: context,
+        builder: (context) {
+          return Dialog(
+            insetPadding: const EdgeInsets.all(24),
+            child: SizedBox(
+              width: 900,
+              height: 700,
+              child: DayEntryPage(
+                date: date,
+                record: existingRecord,
+                readOnly: true,
+              ),
+            ),
+          );
+        },
+      );
+
+      return;
+    }
+
+    // -------------------------------------------------------------------------
+    // Yes = Edit Mode
+    // -------------------------------------------------------------------------
+
+    final bool? saved = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          insetPadding: const EdgeInsets.all(24),
+          child: SizedBox(
+            width: 900,
+            height: 700,
+            child: DayEntryPage(
+              date: date,
+              record: existingRecord,
+              readOnly: false,
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || saved != true) {
+      return;
+    }
+
+    await _loadCompletedDates();
   }
 
   String _formattedDate(DateTime date) {

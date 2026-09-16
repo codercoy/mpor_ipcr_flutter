@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 
 class CalendarWidget extends StatelessWidget {
   final DateTime month;
+  final Set<DateTime> completedDates;
   final ValueChanged<DateTime> onDateSelected;
 
   const CalendarWidget({
     super.key,
     required this.month,
+    required this.completedDates,
     required this.onDateSelected,
   });
 
@@ -19,6 +21,16 @@ class CalendarWidget extends StatelessWidget {
     'SAT',
     'SUN',
   ];
+
+  bool _isCompleted(DateTime date) {
+    final key = DateTime(
+      date.year,
+      date.month,
+      date.day,
+    );
+
+    return completedDates.contains(key);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -130,6 +142,8 @@ class CalendarWidget extends StatelessWidget {
         date.weekday == DateTime.saturday ||
         date.weekday == DateTime.sunday;
 
+    final bool isCompleted = _isCompleted(date);
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -139,14 +153,18 @@ class CalendarWidget extends StatelessWidget {
         },
         child: Container(
           decoration: BoxDecoration(
-            color: isWeekend
-                ? Colors.grey.shade100
-                : Colors.white,
+            color: isCompleted
+                ? Colors.green.shade50
+                : isWeekend
+                    ? Colors.grey.shade100
+                    : Colors.white,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: isWeekend
-                  ? Colors.grey.shade300
-                  : const Color(0xFFE5E7EB),
+              color: isCompleted
+                  ? Colors.green.shade300
+                  : isWeekend
+                      ? Colors.grey.shade300
+                      : const Color(0xFFE5E7EB),
             ),
           ),
           child: Stack(
@@ -159,13 +177,41 @@ class CalendarWidget extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: isWeekend
-                        ? Colors.grey.shade500
-                        : Colors.grey.shade800,
+                    color: isCompleted
+                        ? Colors.green.shade800
+                        : isWeekend
+                            ? Colors.grey.shade500
+                            : Colors.grey.shade800,
                   ),
                 ),
               ),
-              if (isWeekend)
+
+              if (isCompleted)
+                Positioned(
+                  bottom: 8,
+                  left: 8,
+                  right: 8,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.check_circle,
+                        size: 14,
+                        color: Colors.green.shade700,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'COMPLETED',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else if (isWeekend)
                 Positioned(
                   bottom: 8,
                   right: 8,
@@ -175,6 +221,22 @@ class CalendarWidget extends StatelessWidget {
                       fontSize: 9,
                       fontWeight: FontWeight.w600,
                       color: Colors.grey.shade400,
+                    ),
+                  ),
+                )
+              else
+                Positioned(
+                  bottom: 8,
+                  left: 8,
+                  right: 8,
+                  child: Center(
+                    child: Text(
+                      'NOT ENCODED',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey.shade500,
+                      ),
                     ),
                   ),
                 ),
