@@ -1,5 +1,28 @@
+enum DailyAccomplishmentStatus {
+  accomplishment,
+  noAccomplishment,
+  leave,
+  holiday,
+  travelOrder,
+  officialTraining,
+}
+
+enum LeaveType {
+  sickLeave,
+  vacationLeave,
+  specialPrivilegeLeave,
+  mandatoryLeave,
+  wellnessLeave,
+  other,
+}
+
 class DailyAccomplishmentRecord {
   final DateTime date;
+
+  // Daily status
+  final DailyAccomplishmentStatus status;
+  final LeaveType? leaveType;
+  final String? leaveOtherReason;
 
   // Daily accomplishment quantities
   final int servedClients;
@@ -15,7 +38,7 @@ class DailyAccomplishmentRecord {
   final int attendedMeetings;
   final int interveningTasks;
 
-  // Attendance / duty status
+  // Legacy / attendance duty flag
   final bool notRegularDuty;
   final String? dutyStatusReason;
 
@@ -29,6 +52,11 @@ class DailyAccomplishmentRecord {
 
   const DailyAccomplishmentRecord({
     required this.date,
+
+    this.status = DailyAccomplishmentStatus.accomplishment,
+    this.leaveType,
+    this.leaveOtherReason,
+
     this.servedClients = 0,
     this.installValidatePin = 0,
     this.checkedPin = 0,
@@ -41,16 +69,24 @@ class DailyAccomplishmentRecord {
     this.submittedIpcr = 0,
     this.attendedMeetings = 0,
     this.interveningTasks = 0,
+
     this.notRegularDuty = false,
     this.dutyStatusReason,
+
     this.timeIn,
     this.timeOut,
+
     this.tardinessMinutes = 0,
     this.undertimeMinutes = 0,
   });
 
   DailyAccomplishmentRecord copyWith({
     DateTime? date,
+
+    DailyAccomplishmentStatus? status,
+    LeaveType? leaveType,
+    String? leaveOtherReason,
+
     int? servedClients,
     int? installValidatePin,
     int? checkedPin,
@@ -63,42 +99,64 @@ class DailyAccomplishmentRecord {
     int? submittedIpcr,
     int? attendedMeetings,
     int? interveningTasks,
+
     bool? notRegularDuty,
     String? dutyStatusReason,
+
     DateTime? timeIn,
     DateTime? timeOut,
+
     int? tardinessMinutes,
     int? undertimeMinutes,
   }) {
     return DailyAccomplishmentRecord(
       date: date ?? this.date,
-      servedClients: servedClients ?? this.servedClients,
+
+      status: status ?? this.status,
+      leaveType: leaveType ?? this.leaveType,
+      leaveOtherReason:
+          leaveOtherReason ?? this.leaveOtherReason,
+
+      servedClients:
+          servedClients ?? this.servedClients,
       installValidatePin:
           installValidatePin ?? this.installValidatePin,
-      checkedPin: checkedPin ?? this.checkedPin,
+      checkedPin:
+          checkedPin ?? this.checkedPin,
       updatePropertyIndexMaps:
-          updatePropertyIndexMaps ?? this.updatePropertyIndexMaps,
+          updatePropertyIndexMaps ??
+              this.updatePropertyIndexMaps,
       updateTaxMapControlRolls:
-          updateTaxMapControlRolls ?? this.updateTaxMapControlRolls,
+          updateTaxMapControlRolls ??
+              this.updateTaxMapControlRolls,
       updateMunicipalDigitalBaseMaps:
           updateMunicipalDigitalBaseMaps ??
               this.updateMunicipalDigitalBaseMaps,
       plotTechnicalDescription:
-          plotTechnicalDescription ?? this.plotTechnicalDescription,
+          plotTechnicalDescription ??
+              this.plotTechnicalDescription,
       preparedDailyTimeRecord:
-          preparedDailyTimeRecord ?? this.preparedDailyTimeRecord,
-      submittedMpor: submittedMpor ?? this.submittedMpor,
-      submittedIpcr: submittedIpcr ?? this.submittedIpcr,
+          preparedDailyTimeRecord ??
+              this.preparedDailyTimeRecord,
+      submittedMpor:
+          submittedMpor ?? this.submittedMpor,
+      submittedIpcr:
+          submittedIpcr ?? this.submittedIpcr,
       attendedMeetings:
           attendedMeetings ?? this.attendedMeetings,
       interveningTasks:
           interveningTasks ?? this.interveningTasks,
+
       notRegularDuty:
           notRegularDuty ?? this.notRegularDuty,
       dutyStatusReason:
           dutyStatusReason ?? this.dutyStatusReason,
-      timeIn: timeIn ?? this.timeIn,
-      timeOut: timeOut ?? this.timeOut,
+
+      timeIn:
+          timeIn ?? this.timeIn,
+      timeOut:
+          timeOut ?? this.timeOut,
+
       tardinessMinutes:
           tardinessMinutes ?? this.tardinessMinutes,
       undertimeMinutes:

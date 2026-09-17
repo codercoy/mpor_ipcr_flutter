@@ -6,7 +6,8 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class AppDatabase {
   static const String defaultDatabaseName = 'mpor_ipcr.db';
-  static const int _databaseVersion = 2;
+
+  static const int _databaseVersion = 3;
 
   static bool _factoryInitialized = false;
 
@@ -26,6 +27,7 @@ class AppDatabase {
     _initializeDatabaseFactory();
 
     _database = await _openDatabase();
+
     return _database!;
   }
 
@@ -62,6 +64,10 @@ class AppDatabase {
         if (oldVersion < 2) {
           await _createDailyAccomplishmentsTable(db);
         }
+
+        if (oldVersion < 3) {
+          await _upgradeToVersion3(db);
+        }
       },
     );
   }
@@ -73,6 +79,10 @@ class AppDatabase {
       CREATE TABLE daily_accomplishments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         date TEXT NOT NULL UNIQUE,
+
+        daily_status TEXT NOT NULL DEFAULT 'accomplishment',
+        leave_type TEXT,
+        leave_other_reason TEXT,
 
         served_clients INTEGER NOT NULL DEFAULT 0,
         install_validate_pin INTEGER NOT NULL DEFAULT 0,
@@ -97,6 +107,73 @@ class AppDatabase {
         undertime_minutes INTEGER NOT NULL DEFAULT 0
       )
     ''');
+  }
+
+  Future<void> _upgradeToVersion3(
+    Database db,
+  ) async {
+    await db.execute('''
+      ALTER TABLE daily_accomplishments
+      ADD COLUMN daily_status TEXT
+      NOT NULL DEFAULT 'accomplishment'
+    ''');
+
+    await db.execute('''
+      ALTER TABLE daily_accomplishments
+      ADD COLUMN leave_type TEXT
+    ''');
+
+    await db.execute('''
+      ALTER TABLE daily_accomplishments
+      ADD COLUMN leave_other_reason TEXT
+    ''');
+
+    // Preserve and convert existing legacy records.
+    //
+    // Existing "Leave" records become structured Leave records.
+    await db.update(
+      'daily_accomplishments',
+      {
+        'daily_status': 'leave',
+      },
+      where: 'not_regular_duty = 1 AND duty_status_reason = ?',
+      whereArgs: ['Leave'],
+    );
+
+    // Existing holiday records become structured Holiday records.
+    await db.update(
+      'daily_accomplishments',
+      {
+        'daily_status': 'holiday',
+      },
+      where:
+          'not_regular_duty = 1 AND duty_status_reason = ?',
+      whereArgs: ['Holiday / Non-Working Day'],
+    );
+
+    // Existing travel order records.
+    await db.update(
+      'daily_accomplishments',
+      {
+        'daily_status': 'travelOrder',
+      },
+      where:
+          'not_regular_duty = 1 AND duty_status_reason = ?',
+      whereArgs: ['Travel Order'],
+    );
+
+    // Existing official training records.
+    await db.update(
+      'daily_accomplishments',
+      {
+        'daily_status': 'officialTraining',
+      },
+      where:
+          'not_regular_duty = 1 AND duty_status_reason = ?',
+      whereArgs: [
+        'Official Training / Seminar / Workshop',
+      ],
+    );
   }
 
   Future<void> close() async {
