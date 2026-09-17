@@ -1,131 +1,116 @@
 import 'package:flutter/material.dart';
 
+import '../domain/daily_accomplishment_record.dart';
+
 class CalendarWidget extends StatelessWidget {
   final DateTime month;
-  final Set<DateTime> completedDates;
+  final Map<DateTime, DailyAccomplishmentStatus> statusByDate;
   final ValueChanged<DateTime> onDateSelected;
 
   const CalendarWidget({
     super.key,
     required this.month,
-    required this.completedDates,
+    required this.statusByDate,
     required this.onDateSelected,
   });
 
-  static const List<String> _weekdays = [
-    'MON',
-    'TUE',
-    'WED',
-    'THU',
-    'FRI',
-    'SAT',
-    'SUN',
-  ];
-
-  bool _isCompleted(DateTime date) {
-    final key = DateTime(
-      date.year,
-      date.month,
-      date.day,
-    );
-
-    return completedDates.contains(key);
-  }
-
   @override
   Widget build(BuildContext context) {
-    final int daysInMonth = DateTime(
+    final firstDayOfMonth = DateTime(
+      month.year,
+      month.month,
+      1,
+    );
+
+    final daysInMonth = DateTime(
       month.year,
       month.month + 1,
       0,
     ).day;
 
-    final int firstWeekday = DateTime(
-      month.year,
-      month.month,
-      1,
-    ).weekday;
+    final leadingEmptyDays =
+        firstDayOfMonth.weekday - DateTime.monday;
 
-    final int leadingEmptyDays = firstWeekday - 1;
+    final totalCells =
+        ((leadingEmptyDays + daysInMonth) / 7).ceil() * 7;
 
-    final List<Widget> cells = [];
-
-    for (int i = 0; i < leadingEmptyDays; i++) {
-      cells.add(_buildEmptyCell());
-    }
-
-    for (int day = 1; day <= daysInMonth; day++) {
-      final DateTime date = DateTime(
-        month.year,
-        month.month,
-        day,
-      );
-
-      cells.add(
-        _buildDayCell(
-          context,
-          date,
-        ),
-      );
-    }
-
-    while (cells.length % 7 != 0) {
-      cells.add(_buildEmptyCell());
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: const Color(0xFFE5E7EB),
-        ),
-      ),
+    return SingleChildScrollView(
       child: Column(
         children: [
           _buildWeekdayHeader(),
-          const SizedBox(height: 12),
-          Expanded(
-            child: Scrollbar(
-              thumbVisibility: true,
-              child: GridView.builder(
-                padding: const EdgeInsets.only(right: 8),
-                itemCount: cells.length,
-                gridDelegate:
-                    const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 7,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
-                  childAspectRatio: 1.0,
-                ),
-                itemBuilder: (context, index) {
-                  return cells[index];
-                },
-              ),
+          const SizedBox(height: 8),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate:
+                const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              childAspectRatio: 1.25,
             ),
+            itemCount: totalCells,
+            itemBuilder: (context, index) {
+              final dayNumber =
+                  index - leadingEmptyDays + 1;
+
+              if (dayNumber < 1 ||
+                  dayNumber > daysInMonth) {
+                return const SizedBox.shrink();
+              }
+
+              final date = DateTime(
+                month.year,
+                month.month,
+                dayNumber,
+              );
+
+              final normalizedDate = DateTime(
+                date.year,
+                date.month,
+                date.day,
+              );
+
+              final status =
+                  statusByDate[normalizedDate];
+
+              return _buildDayCell(
+                context,
+                date,
+                status,
+              );
+            },
           ),
+          const SizedBox(height: 16),
+          _buildLegend(),
         ],
       ),
     );
   }
 
   Widget _buildWeekdayHeader() {
+    const weekdays = [
+      'Mon',
+      'Tue',
+      'Wed',
+      'Thu',
+      'Fri',
+      'Sat',
+      'Sun',
+    ];
+
     return Row(
-      children: _weekdays.map((weekday) {
-        final bool isWeekend =
-            weekday == 'SAT' || weekday == 'SUN';
+      children: weekdays.map((day) {
+        final isWeekend =
+            day == 'Sat' || day == 'Sun';
 
         return Expanded(
           child: Center(
             child: Text(
-              weekday,
+              day,
               style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w600,
                 color: isWeekend
                     ? Colors.grey.shade500
-                    : Colors.grey.shade700,
+                    : Colors.grey,
               ),
             ),
           ),
@@ -137,122 +122,170 @@ class CalendarWidget extends StatelessWidget {
   Widget _buildDayCell(
     BuildContext context,
     DateTime date,
+    DailyAccomplishmentStatus? status,
   ) {
-    final bool isWeekend =
+    final isToday = _isSameDate(
+      date,
+      DateTime.now(),
+    );
+
+    final isWeekend =
         date.weekday == DateTime.saturday ||
         date.weekday == DateTime.sunday;
 
-    final bool isCompleted = _isCompleted(date);
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: () {
-          onDateSelected(date);
-        },
-        child: Container(
-          decoration: BoxDecoration(
-            color: isCompleted
-                ? Colors.green.shade50
-                : isWeekend
-                    ? Colors.grey.shade100
-                    : Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isCompleted
-                  ? Colors.green.shade300
-                  : isWeekend
-                      ? Colors.grey.shade300
-                      : const Color(0xFFE5E7EB),
+    return Padding(
+      padding: const EdgeInsets.all(3),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () => onDateSelected(date),
+          child: Container(
+            decoration: BoxDecoration(
+              color: isWeekend
+                  ? Colors.grey.shade200
+                  : Colors.transparent,
+              border: Border.all(
+                color: isToday
+                    ? Theme.of(context)
+                        .colorScheme
+                        .primary
+                    : Colors.grey.shade300,
+                width: isToday ? 2 : 1,
+              ),
+              borderRadius: BorderRadius.circular(10),
             ),
-          ),
-          child: Stack(
-            children: [
-              Positioned(
-                top: 10,
-                left: 10,
-                child: Text(
+            child: Column(
+              mainAxisAlignment:
+                  MainAxisAlignment.center,
+              children: [
+                Text(
                   '${date.day}',
                   style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: isCompleted
-                        ? Colors.green.shade800
-                        : isWeekend
-                            ? Colors.grey.shade500
-                            : Colors.grey.shade800,
+                    fontSize: 16,
+                    fontWeight: isToday
+                        ? FontWeight.bold
+                        : FontWeight.w500,
+                    color: isWeekend
+                        ? Colors.grey.shade600
+                        : null,
                   ),
                 ),
-              ),
-
-              if (isCompleted)
-                Positioned(
-                  bottom: 8,
-                  left: 8,
-                  right: 8,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.check_circle,
-                        size: 14,
-                        color: Colors.green.shade700,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'COMPLETED',
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green.shade700,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              else if (isWeekend)
-                Positioned(
-                  bottom: 8,
-                  right: 8,
-                  child: Text(
-                    'WEEKEND',
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade400,
-                    ),
-                  ),
-                )
-              else
-                Positioned(
-                  bottom: 8,
-                  left: 8,
-                  right: 8,
-                  child: Center(
-                    child: Text(
-                      'NOT ENCODED',
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+                const SizedBox(height: 6),
+                if (status != null)
+                  _buildStatusIndicator(status),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildEmptyCell() {
+  Widget _buildStatusIndicator(
+    DailyAccomplishmentStatus status,
+  ) {
     return Container(
+      width: 12,
+      height: 12,
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(10),
+        color: _statusColor(status),
+        shape: BoxShape.circle,
       ),
     );
+  }
+
+  Color _statusColor(
+    DailyAccomplishmentStatus status,
+  ) {
+    switch (status) {
+      case DailyAccomplishmentStatus.accomplishment:
+        return Colors.green;
+
+      case DailyAccomplishmentStatus.noAccomplishment:
+        return Colors.amber;
+
+      case DailyAccomplishmentStatus.leave:
+        return Colors.blue;
+
+      case DailyAccomplishmentStatus.holiday:
+        return Colors.purple;
+
+      case DailyAccomplishmentStatus.travelOrder:
+        return Colors.orange;
+
+      case DailyAccomplishmentStatus.officialTraining:
+        return Colors.teal;
+    }
+  }
+
+  Widget _buildLegend() {
+    return Wrap(
+      spacing: 18,
+      runSpacing: 10,
+      alignment: WrapAlignment.center,
+      children: [
+        _legendItem(
+          'Accomplishment',
+          Colors.green,
+        ),
+        _legendItem(
+          'No Accomplishment',
+          Colors.amber,
+        ),
+        _legendItem(
+          'Leave',
+          Colors.blue,
+        ),
+        _legendItem(
+          'Holiday',
+          Colors.purple,
+        ),
+        _legendItem(
+          'Travel Order',
+          Colors.orange,
+        ),
+        _legendItem(
+          'Official Training',
+          Colors.teal,
+        ),
+      ],
+    );
+  }
+
+  Widget _legendItem(
+    String label,
+    Color color,
+  ) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Colors.grey,
+          ),
+        ),
+      ],
+    );
+  }
+
+  bool _isSameDate(
+    DateTime first,
+    DateTime second,
+  ) {
+    return first.year == second.year &&
+        first.month == second.month &&
+        first.day == second.day;
   }
 }

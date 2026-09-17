@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/daily_accomplishment_repository.dart';
+import '../domain/daily_accomplishment_record.dart';
 
 import 'calendar_widget.dart';
 import 'day_entry_page.dart';
@@ -17,15 +18,15 @@ class _DailyAccomplishmentPageState
     extends State<DailyAccomplishmentPage> {
   DateTime _displayedMonth = DateTime(2026, 9);
 
-  Set<DateTime> _completedDates = {};
+  Map<DateTime, DailyAccomplishmentStatus> _statusByDate = {};
 
   @override
   void initState() {
     super.initState();
-    _loadCompletedDates();
+    _loadMonthRecords();
   }
 
-  Future<void> _loadCompletedDates() async {
+  Future<void> _loadMonthRecords() async {
     final records =
         await dailyAccomplishmentRepository.getMonth(
       _displayedMonth.year,
@@ -35,15 +36,14 @@ class _DailyAccomplishmentPageState
     if (!mounted) return;
 
     setState(() {
-      _completedDates = records
-          .map(
-            (record) => DateTime(
-              record.date.year,
-              record.date.month,
-              record.date.day,
-            ),
-          )
-          .toSet();
+      _statusByDate = {
+        for (final record in records)
+          DateTime(
+            record.date.year,
+            record.date.month,
+            record.date.day,
+          ): record.status,
+      };
     });
   }
 
@@ -59,7 +59,7 @@ class _DailyAccomplishmentPageState
           Expanded(
             child: CalendarWidget(
               month: _displayedMonth,
-              completedDates: _completedDates,
+              statusByDate: _statusByDate,
               onDateSelected: _handleDateSelected,
             ),
           ),
@@ -135,7 +135,7 @@ class _DailyAccomplishmentPageState
       );
     });
 
-    _loadCompletedDates();
+    _loadMonthRecords();
   }
 
   void _goToNextMonth() {
@@ -146,34 +146,12 @@ class _DailyAccomplishmentPageState
       );
     });
 
-    _loadCompletedDates();
+    _loadMonthRecords();
   }
 
-  Future<void> _handleDateSelected(DateTime date) async {
-    // First check whether an accomplishment already exists.
-    //
-    // This check must happen BEFORE the weekend check.
-    // An existing accomplishment means the date has already
-    // been encoded, regardless of whether it is a weekday
-    // or weekend.
-    final existingRecord =
-        await dailyAccomplishmentRepository.get(date);
-
-    if (!mounted) return;
-
-    if (existingRecord != null) {
-      await _handleExistingRecord(
-        date,
-        existingRecord,
-      );
-      return;
-    }
-
-    // No existing accomplishment.
-    //
-    // Only now do we need to determine whether this is a
-    // weekend that requires confirmation before creating
-    // a new entry.
+  Future<void> _handleDateSelected(
+    DateTime date,
+  ) async {
     final bool isWeekend =
         date.weekday == DateTime.saturday ||
         date.weekday == DateTime.sunday;
@@ -183,17 +161,85 @@ class _DailyAccomplishmentPageState
       return;
     }
 
-    await _openDayEntry(
-      date,
-      record: null,
-    );
+    await _openDayEntry(date);
   }
 
-  Future<void> _handleExistingRecord(
+  Future<void> _showWeekendWorkDialog(
     DateTime date,
-    dynamic existingRecord,
   ) async {
-    final bool? edit = await showDialog<bool>(
+    final bool? isWorking =
+        await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Weekend'),
+          content: Text(
+            'Are you working on ${_formattedDate(date)}?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(false);
+              },
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(context).pop(true);
+              },
+              child: const Text("Yes, I'm working"),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted || isWorking != true) {
+      return;
+    }
+
+    await _openDayEntry(date);
+  }
+
+  Future<void> _openDayEntry(
+    DateTime date,
+  ) async {
+    final existingRecord =
+        await dailyAccomplishmentRepository.get(date);
+
+    if (!mounted) return;
+
+    if (existingRecord == null) {
+      final bool? saved =
+          await showDialog<bool>(
+        context: context,
+        builder: (context) {
+          return Dialog(
+            insetPadding:
+                const EdgeInsets.all(24),
+            child: SizedBox(
+              width: 900,
+              height: 700,
+              child: DayEntryPage(
+                date: date,
+                record: null,
+                readOnly: false,
+              ),
+            ),
+          );
+        },
+      );
+
+      if (!mounted || saved != true) {
+        return;
+      }
+
+      await _loadMonthRecords();
+      return;
+    }
+
+    final bool? edit =
+        await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
@@ -225,75 +271,42 @@ class _DailyAccomplishmentPageState
     if (!mounted) return;
 
     if (edit != true) {
-      await _openDayEntry(
-        date,
-        record: existingRecord,
-        readOnly: true,
+      await showDialog<void>(
+        context: context,
+        builder: (context) {
+          return Dialog(
+            insetPadding:
+                const EdgeInsets.all(24),
+            child: SizedBox(
+              width: 900,
+              height: 700,
+              child: DayEntryPage(
+                date: date,
+                record: existingRecord,
+                readOnly: true,
+              ),
+            ),
+          );
+        },
       );
+
       return;
     }
 
-    await _openDayEntry(
-      date,
-      record: existingRecord,
-      readOnly: false,
-    );
-  }
-
-  Future<void> _showWeekendWorkDialog(DateTime date) async {
-    final bool? isWorking = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Weekend'),
-          content: Text(
-            'Are you working on ${_formattedDate(date)}?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(false);
-              },
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                Navigator.of(context).pop(true);
-              },
-              child: const Text("Yes, I'm working"),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (!mounted || isWorking != true) {
-      return;
-    }
-
-    await _openDayEntry(
-      date,
-      record: null,
-    );
-  }
-
-  Future<void> _openDayEntry(
-    DateTime date, {
-    dynamic record,
-    bool readOnly = false,
-  }) async {
-    final bool? saved = await showDialog<bool>(
+    final bool? saved =
+        await showDialog<bool>(
       context: context,
       builder: (context) {
         return Dialog(
-          insetPadding: const EdgeInsets.all(24),
+          insetPadding:
+              const EdgeInsets.all(24),
           child: SizedBox(
             width: 900,
             height: 700,
             child: DayEntryPage(
               date: date,
-              record: record,
-              readOnly: readOnly,
+              record: existingRecord,
+              readOnly: false,
             ),
           ),
         );
@@ -304,7 +317,7 @@ class _DailyAccomplishmentPageState
       return;
     }
 
-    await _loadCompletedDates();
+    await _loadMonthRecords();
   }
 
   String _formattedDate(DateTime date) {
@@ -323,7 +336,8 @@ class _DailyAccomplishmentPageState
       'December',
     ];
 
-    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+    return '${months[date.month - 1]} '
+        '${date.day}, ${date.year}';
   }
 
   String _monthTitle(DateTime date) {
