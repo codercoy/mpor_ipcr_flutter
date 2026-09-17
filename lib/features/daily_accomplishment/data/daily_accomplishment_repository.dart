@@ -1,48 +1,47 @@
 import '../domain/daily_accomplishment_record.dart';
+import 'daily_accomplishment_local_datasource.dart';
 
 class DailyAccomplishmentRepository {
-  final Map<DateTime, DailyAccomplishmentRecord> _records = {};
+  final DailyAccomplishmentLocalDataSource _dataSource;
 
-  DateTime _dateKey(DateTime date) {
-    return DateTime(date.year, date.month, date.day);
+  DailyAccomplishmentRepository({
+    DailyAccomplishmentLocalDataSource? dataSource,
+  }) : _dataSource =
+            dataSource ?? DailyAccomplishmentLocalDataSource();
+
+  Future<void> save(
+    DailyAccomplishmentRecord record,
+  ) async {
+    await _dataSource.save(record);
   }
 
-  Future<void> save(DailyAccomplishmentRecord record) async {
-    final key = _dateKey(record.date);
-
-    _records[key] = record.copyWith(
-      date: key,
-    );
+  Future<DailyAccomplishmentRecord?> get(
+    DateTime date,
+  ) async {
+    return _dataSource.get(date);
   }
 
-  Future<DailyAccomplishmentRecord?> get(DateTime date) async {
-    return _records[_dateKey(date)];
-  }
-
-  Future<bool> exists(DateTime date) async {
-    return _records.containsKey(_dateKey(date));
+  Future<bool> exists(
+    DateTime date,
+  ) async {
+    return _dataSource.exists(date);
   }
 
   Future<List<DailyAccomplishmentRecord>> getMonth(
     int year,
     int month,
   ) async {
-    return _records.values
-        .where(
-          (record) =>
-              record.date.year == year &&
-              record.date.month == month,
-        )
-        .toList()
-      ..sort(
-        (a, b) => a.date.compareTo(b.date),
-      );
+    return _dataSource.getMonth(year, month);
+  }
+
+  Future<void> close() async {
+    await _dataSource.close();
   }
 }
 
 /// Shared repository instance used by the Daily Accomplishment feature.
 ///
-/// This is temporary in-memory storage. It will later be replaced by
-/// persistent local storage without changing the presentation layer.
+/// The repository now uses persistent local SQLite storage through
+/// DailyAccomplishmentLocalDataSource.
 final dailyAccomplishmentRepository =
     DailyAccomplishmentRepository();

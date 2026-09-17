@@ -57,12 +57,11 @@ class _DailyAccomplishmentPageState
           _buildHeader(),
           const SizedBox(height: 24),
           Expanded(
-            child:CalendarWidget(
-                    
-                    month: _displayedMonth,
-                    completedDates: _completedDates,                    
-                    onDateSelected: _handleDateSelected,
-                  ),
+            child: CalendarWidget(
+              month: _displayedMonth,
+              completedDates: _completedDates,
+              onDateSelected: _handleDateSelected,
+            ),
           ),
         ],
       ),
@@ -135,6 +134,8 @@ class _DailyAccomplishmentPageState
         _displayedMonth.month - 1,
       );
     });
+
+    _loadCompletedDates();
   }
 
   void _goToNextMonth() {
@@ -144,9 +145,35 @@ class _DailyAccomplishmentPageState
         _displayedMonth.month + 1,
       );
     });
+
+    _loadCompletedDates();
   }
 
   Future<void> _handleDateSelected(DateTime date) async {
+    // First check whether an accomplishment already exists.
+    //
+    // This check must happen BEFORE the weekend check.
+    // An existing accomplishment means the date has already
+    // been encoded, regardless of whether it is a weekday
+    // or weekend.
+    final existingRecord =
+        await dailyAccomplishmentRepository.get(date);
+
+    if (!mounted) return;
+
+    if (existingRecord != null) {
+      await _handleExistingRecord(
+        date,
+        existingRecord,
+      );
+      return;
+    }
+
+    // No existing accomplishment.
+    //
+    // Only now do we need to determine whether this is a
+    // weekend that requires confirmation before creating
+    // a new entry.
     final bool isWeekend =
         date.weekday == DateTime.saturday ||
         date.weekday == DateTime.sunday;
@@ -156,7 +183,61 @@ class _DailyAccomplishmentPageState
       return;
     }
 
-    await _openDayEntry(date);
+    await _openDayEntry(
+      date,
+      record: null,
+    );
+  }
+
+  Future<void> _handleExistingRecord(
+    DateTime date,
+    dynamic existingRecord,
+  ) async {
+    final bool? edit = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text(
+            'Daily Accomplishment Already Encoded',
+          ),
+          content: const Text(
+            'This Daily Accomplishment has already been encoded.\n\n'
+            'Do you want to edit this entry?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(false);
+              },
+              child: const Text('No'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(context).pop(true);
+              },
+              child: const Text('Yes'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted) return;
+
+    if (edit != true) {
+      await _openDayEntry(
+        date,
+        record: existingRecord,
+        readOnly: true,
+      );
+      return;
+    }
+
+    await _openDayEntry(
+      date,
+      record: existingRecord,
+      readOnly: false,
+    );
   }
 
   Future<void> _showWeekendWorkDialog(DateTime date) async {
@@ -190,110 +271,17 @@ class _DailyAccomplishmentPageState
       return;
     }
 
-    await _openDayEntry(date);
+    await _openDayEntry(
+      date,
+      record: null,
+    );
   }
 
-  Future<void> _openDayEntry(DateTime date) async {
-    final existingRecord =
-        await dailyAccomplishmentRepository.get(date);
-
-    if (!mounted) return;
-
-    // -------------------------------------------------------------------------
-    // No existing record = new entry
-    // -------------------------------------------------------------------------
-
-    if (existingRecord == null) {
-      final bool? saved = await showDialog<bool>(
-        context: context,
-        builder: (context) {
-          return Dialog(
-            insetPadding: const EdgeInsets.all(24),
-            child: SizedBox(
-              width: 900,
-              height: 700,
-              child: DayEntryPage(
-                date: date,
-                record: null,
-                readOnly: false,
-              ),
-            ),
-          );
-        },
-      );
-
-      if (!mounted || saved != true) {
-        return;
-      }
-      await _loadCompletedDates();
-      return;
-    }
-
-    // -------------------------------------------------------------------------
-    // Existing record = ask whether to edit
-    // -------------------------------------------------------------------------
-
-    final bool? edit = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text(
-            'Daily Accomplishment Already Encoded',
-          ),
-          content: const Text(
-            'This Daily Accomplishment has already been encoded.\n\n'
-            'Do you want to edit this entry?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(false);
-              },
-              child: const Text('No'),
-            ),
-            FilledButton(
-              onPressed: () {
-                Navigator.of(context).pop(true);
-              },
-              child: const Text('Yes'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (!mounted) return;
-
-    // -------------------------------------------------------------------------
-    // No = View Mode
-    // -------------------------------------------------------------------------
-
-    if (edit != true) {
-      await showDialog<void>(
-        context: context,
-        builder: (context) {
-          return Dialog(
-            insetPadding: const EdgeInsets.all(24),
-            child: SizedBox(
-              width: 900,
-              height: 700,
-              child: DayEntryPage(
-                date: date,
-                record: existingRecord,
-                readOnly: true,
-              ),
-            ),
-          );
-        },
-      );
-
-      return;
-    }
-
-    // -------------------------------------------------------------------------
-    // Yes = Edit Mode
-    // -------------------------------------------------------------------------
-
+  Future<void> _openDayEntry(
+    DateTime date, {
+    dynamic record,
+    bool readOnly = false,
+  }) async {
     final bool? saved = await showDialog<bool>(
       context: context,
       builder: (context) {
@@ -304,8 +292,8 @@ class _DailyAccomplishmentPageState
             height: 700,
             child: DayEntryPage(
               date: date,
-              record: existingRecord,
-              readOnly: false,
+              record: record,
+              readOnly: readOnly,
             ),
           ),
         );
