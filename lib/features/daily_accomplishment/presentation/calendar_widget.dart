@@ -28,8 +28,10 @@ class CalendarWidget extends StatelessWidget {
       0,
     ).day;
 
+    // Sunday-first calendar:
+    // Sunday = 0, Monday = 1, ..., Saturday = 6.
     final leadingEmptyDays =
-        firstDayOfMonth.weekday - DateTime.monday;
+        firstDayOfMonth.weekday % 7;
 
     final totalCells =
         ((leadingEmptyDays + daysInMonth) / 7).ceil() * 7;
@@ -88,13 +90,13 @@ class CalendarWidget extends StatelessWidget {
 
   Widget _buildWeekdayHeader() {
     const weekdays = [
+      'Sun',
       'Mon',
       'Tue',
       'Wed',
       'Thu',
       'Fri',
       'Sat',
-      'Sun',
     ];
 
     return Row(

@@ -7,7 +7,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 class AppDatabase {
   static const String defaultDatabaseName = 'mpor_ipcr.db';
 
-  static const int _databaseVersion = 3;
+  static const int _databaseVersion = 4;
 
   static bool _factoryInitialized = false;
 
@@ -59,6 +59,7 @@ class AppDatabase {
       version: _databaseVersion,
       onCreate: (db, version) async {
         await _createDailyAccomplishmentsTable(db);
+        await _createMonthlyReportLayoutTable(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -67,6 +68,10 @@ class AppDatabase {
 
         if (oldVersion < 3) {
           await _upgradeToVersion3(db);
+        }
+
+        if (oldVersion < 4) {
+          await _upgradeToVersion4(db);
         }
       },
     );
@@ -107,6 +112,33 @@ class AppDatabase {
         undertime_minutes INTEGER NOT NULL DEFAULT 0
       )
     ''');
+  }
+
+  Future<void> _createMonthlyReportLayoutTable(
+    Database db,
+  ) async {
+    await db.execute('''
+      CREATE TABLE monthly_report_layout (
+        id INTEGER PRIMARY KEY,
+        activity_width REAL NOT NULL DEFAULT 220,
+        day_width REAL NOT NULL DEFAULT 32,
+        week_width REAL NOT NULL DEFAULT 40,
+        month_width REAL NOT NULL DEFAULT 48,
+        row_height REAL NOT NULL DEFAULT 36
+      )
+    ''');
+
+    await db.insert(
+      'monthly_report_layout',
+      {
+        'id': 1,
+        'activity_width': 220.0,
+        'day_width': 32.0,
+        'week_width': 40.0,
+        'month_width': 48.0,
+        'row_height': 36.0,
+      },
+    );
   }
 
   Future<void> _upgradeToVersion3(
@@ -174,6 +206,12 @@ class AppDatabase {
         'Official Training / Seminar / Workshop',
       ],
     );
+  }
+
+  Future<void> _upgradeToVersion4(
+    Database db,
+  ) async {
+    await _createMonthlyReportLayoutTable(db);
   }
 
   Future<void> close() async {

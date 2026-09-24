@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../data/daily_accomplishment_repository.dart';
 import '../domain/daily_accomplishment_record.dart';
@@ -16,11 +17,14 @@ class DayEntryPage extends StatefulWidget {
   });
 
   @override
-  State<DayEntryPage> createState() =>
-      _DayEntryPageState();
+  State<DayEntryPage> createState() => _DayEntryPageState();
 }
 
 class _DayEntryPageState extends State<DayEntryPage> {
+  // ---------------------------------------------------------------------------
+  // Tasks
+  // ---------------------------------------------------------------------------
+
   final List<_TaskEntry> _tasks = [
     _TaskEntry('Served Clients / Taxpayers'),
     _TaskEntry('Install / Validate PIN'),
@@ -32,19 +36,16 @@ class _DayEntryPageState extends State<DayEntryPage> {
     _TaskEntry('Prepared Daily Time Record'),
     _TaskEntry('Submitted MPOR'),
     _TaskEntry('Submitted IPCR'),
-    _TaskEntry(
-      'Attended Meetings / Seminars / Workshops',
-    ),
+    _TaskEntry('Attended Meetings / Seminars / Workshops'),
     _TaskEntry('Intervening Tasks'),
   ];
 
-  DailyAccomplishmentStatus _status =
-      DailyAccomplishmentStatus.accomplishment;
+  // ---------------------------------------------------------------------------
+  // Attendance
+  // ---------------------------------------------------------------------------
 
-  LeaveType? _leaveType;
-
-  final TextEditingController _leaveOtherController =
-      TextEditingController();
+  bool _notRegularDuty = false;
+  String? _dutyStatusReason;
 
   TimeOfDay? _timeIn;
   TimeOfDay? _timeOut;
@@ -52,61 +53,47 @@ class _DayEntryPageState extends State<DayEntryPage> {
   int _tardinessMinutes = 0;
   int _undertimeMinutes = 0;
 
-  static const TimeOfDay _officialStartTime =
-      TimeOfDay(
+  // Temporary official schedule for testing.
+  // This will become configurable later.
+  static const TimeOfDay _officialStartTime = TimeOfDay(
     hour: 8,
     minute: 0,
   );
 
-  static const TimeOfDay _officialEndTime =
-      TimeOfDay(
+  static const TimeOfDay _officialEndTime = TimeOfDay(
     hour: 17,
     minute: 0,
   );
 
   bool get _isReadOnly => widget.readOnly;
 
-  bool get _isOnDuty =>
-      _status ==
-          DailyAccomplishmentStatus.accomplishment ||
-      _status ==
-          DailyAccomplishmentStatus.noAccomplishment;
-
-  bool get _isLeave =>
-      _status == DailyAccomplishmentStatus.leave;
+  // ---------------------------------------------------------------------------
+  // Initialization
+  // ---------------------------------------------------------------------------
 
   @override
   void initState() {
     super.initState();
-
     _loadExistingRecord();
-  }
-
-  @override
-  void dispose() {
-    _leaveOtherController.dispose();
-
-    super.dispose();
   }
 
   void _loadExistingRecord() {
     final record = widget.record;
 
     if (record == null) {
+      _initializeTaskControllers();
       return;
     }
 
     for (int i = 0; i < _tasks.length; i++) {
-      _tasks[i].quantity =
-          _taskQuantity(record, i);
+      final quantity = _taskQuantity(record, i);
+
+      _tasks[i].quantity = quantity;
+      _tasks[i].controller.text = '$quantity';
     }
 
-    _status = record.status;
-
-    _leaveType = record.leaveType;
-
-    _leaveOtherController.text =
-        record.leaveOtherReason ?? '';
+    _notRegularDuty = record.notRegularDuty;
+    _dutyStatusReason = record.dutyStatusReason;
 
     if (record.timeIn != null) {
       _timeIn = TimeOfDay(
@@ -122,11 +109,23 @@ class _DayEntryPageState extends State<DayEntryPage> {
       );
     }
 
-    _tardinessMinutes =
-        record.tardinessMinutes;
+    _tardinessMinutes = record.tardinessMinutes;
+    _undertimeMinutes = record.undertimeMinutes;
+  }
 
-    _undertimeMinutes =
-        record.undertimeMinutes;
+  void _initializeTaskControllers() {
+    for (final task in _tasks) {
+      task.controller.text = '0';
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final task in _tasks) {
+      task.controller.dispose();
+    }
+
+    super.dispose();
   }
 
   int _taskQuantity(
@@ -136,50 +135,41 @@ class _DayEntryPageState extends State<DayEntryPage> {
     switch (index) {
       case 0:
         return record.servedClients;
-
       case 1:
         return record.installValidatePin;
-
       case 2:
         return record.checkedPin;
-
       case 3:
         return record.updatePropertyIndexMaps;
-
       case 4:
         return record.updateTaxMapControlRolls;
-
       case 5:
         return record.updateMunicipalDigitalBaseMaps;
-
       case 6:
         return record.plotTechnicalDescription;
-
       case 7:
         return record.preparedDailyTimeRecord;
-
       case 8:
         return record.submittedMpor;
-
       case 9:
         return record.submittedIpcr;
-
       case 10:
         return record.attendedMeetings;
-
       case 11:
         return record.interveningTasks;
-
       default:
         return 0;
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Build
+  // ---------------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor:
-          const Color(0xFFF5F6FA),
+      backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
         title: Text(
           _isReadOnly
@@ -195,37 +185,19 @@ class _DayEntryPageState extends State<DayEntryPage> {
       body: Padding(
         padding: const EdgeInsets.all(28),
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildDateHeader(),
-
             const SizedBox(height: 24),
-
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildStatusSection(),
-
+                    _buildTasksSection(),
                     const SizedBox(height: 24),
-
-                    if (_status ==
-                        DailyAccomplishmentStatus
-                            .accomplishment)
-                      _buildTasksSection(),
-
-                    if (_status ==
-                        DailyAccomplishmentStatus
-                            .accomplishment)
-                      const SizedBox(height: 24),
-
                     _buildAttendanceSection(),
-
                     const SizedBox(height: 28),
-
                     _buildActionButtons(),
                   ],
                 ),
@@ -237,10 +209,13 @@ class _DayEntryPageState extends State<DayEntryPage> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Date Header
+  // ---------------------------------------------------------------------------
+
   Widget _buildDateHeader() {
     return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           _isReadOnly
@@ -253,9 +228,7 @@ class _DayEntryPageState extends State<DayEntryPage> {
             fontWeight: FontWeight.bold,
           ),
         ),
-
         const SizedBox(height: 6),
-
         Text(
           _formattedDate(widget.date),
           style: TextStyle(
@@ -268,218 +241,16 @@ class _DayEntryPageState extends State<DayEntryPage> {
     );
   }
 
-  Widget _buildStatusSection() {
-    return _buildCard(
-      title: 'Daily Status',
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Status',
-                    style: TextStyle(
-                      fontSize: 15,
-                    ),
-                  ),
-                ),
-                DropdownButton<
-                    DailyAccomplishmentStatus>(
-                  value: _status,
-                  items: const [
-                    DropdownMenuItem(
-                      value:
-                          DailyAccomplishmentStatus
-                              .accomplishment,
-                      child: Text(
-                        'Accomplishment',
-                      ),
-                    ),
-                    DropdownMenuItem(
-                      value:
-                          DailyAccomplishmentStatus
-                              .noAccomplishment,
-                      child: Text(
-                        'On Duty – No Accomplishment',
-                      ),
-                    ),
-                    DropdownMenuItem(
-                      value:
-                          DailyAccomplishmentStatus
-                              .leave,
-                      child: Text('Leave'),
-                    ),
-                    DropdownMenuItem(
-                      value:
-                          DailyAccomplishmentStatus
-                              .holiday,
-                      child: Text(
-                        'Holiday / Non-Working Day',
-                      ),
-                    ),
-                    DropdownMenuItem(
-                      value:
-                          DailyAccomplishmentStatus
-                              .travelOrder,
-                      child: Text('Travel Order'),
-                    ),
-                    DropdownMenuItem(
-                      value:
-                          DailyAccomplishmentStatus
-                              .officialTraining,
-                      child: Text(
-                        'Official Training / Seminar / Workshop',
-                      ),
-                    ),
-                  ],
-                  onChanged: _isReadOnly
-                      ? null
-                      : (value) {
-                          if (value == null) {
-                            return;
-                          }
-
-                          _changeStatus(value);
-                        },
-                ),
-              ],
-            ),
-
-            if (_isLeave) ...[
-              const Divider(height: 24),
-              _buildLeaveTypeRow(),
-            ],
-
-            if (_isLeave &&
-                _leaveType == LeaveType.other) ...[
-              const Divider(height: 24),
-              _buildLeaveOtherReason(),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _changeStatus(
-    DailyAccomplishmentStatus status,
-  ) {
-    setState(() {
-      _status = status;
-
-      if (status !=
-          DailyAccomplishmentStatus.leave) {
-        _leaveType = null;
-        _leaveOtherController.clear();
-      }
-
-      if (status !=
-          DailyAccomplishmentStatus
-              .accomplishment) {
-        _clearTaskQuantities();
-      }
-
-      if (!_isOnDuty) {
-        _timeIn = null;
-        _timeOut = null;
-        _tardinessMinutes = 0;
-        _undertimeMinutes = 0;
-      }
-
-      if (_isOnDuty) {
-        _calculateAttendanceMinutes();
-      }
-    });
-  }
-
-  void _clearTaskQuantities() {
-    for (final task in _tasks) {
-      task.quantity = 0;
-    }
-  }
-
-  Widget _buildLeaveTypeRow() {
-    return Row(
-      children: [
-        const Expanded(
-          child: Text(
-            'Leave Type',
-            style: TextStyle(
-              fontSize: 15,
-            ),
-          ),
-        ),
-        DropdownButton<LeaveType>(
-          value: _leaveType,
-          hint: const Text('Select'),
-          items: const [
-            DropdownMenuItem(
-              value: LeaveType.sickLeave,
-              child: Text('Sick Leave'),
-            ),
-            DropdownMenuItem(
-              value: LeaveType.vacationLeave,
-              child: Text('Vacation Leave'),
-            ),
-            DropdownMenuItem(
-              value:
-                  LeaveType.specialPrivilegeLeave,
-              child: Text(
-                'Special Privilege Leave',
-              ),
-            ),
-            DropdownMenuItem(
-              value: LeaveType.mandatoryLeave,
-              child: Text('Mandatory Leave'),
-            ),
-            DropdownMenuItem(
-              value: LeaveType.wellnessLeave,
-              child: Text('Wellness Leave'),
-            ),
-            DropdownMenuItem(
-              value: LeaveType.other,
-              child: Text('Others'),
-            ),
-          ],
-          onChanged: _isReadOnly
-              ? null
-              : (value) {
-                  setState(() {
-                    _leaveType = value;
-
-                    if (value != LeaveType.other) {
-                      _leaveOtherController.clear();
-                    }
-                  });
-                },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLeaveOtherReason() {
-    return TextField(
-      controller: _leaveOtherController,
-      enabled: !_isReadOnly,
-      decoration: const InputDecoration(
-        labelText: 'Other Leave',
-        hintText: 'Specify leave type',
-        border: OutlineInputBorder(),
-      ),
-      maxLength: 100,
-    );
-  }
+  // ---------------------------------------------------------------------------
+  // Accomplishments
+  // ---------------------------------------------------------------------------
 
   Widget _buildTasksSection() {
     return _buildCard(
       title: 'Accomplishments',
       child: Column(
         children: [
-          for (int i = 0;
-              i < _tasks.length;
-              i++) ...[
+          for (int i = 0; i < _tasks.length; i++) ...[
             _buildTaskRow(i),
             if (i < _tasks.length - 1)
               const Divider(height: 1),
@@ -508,32 +279,102 @@ class _DayEntryPageState extends State<DayEntryPage> {
             ),
           ),
 
+          // Minus
           _buildCounterButton(
             icon: Icons.remove,
-            onPressed:
-                _isReadOnly ||
-                        task.quantity <= 0
-                    ? null
-                    : () {
-                        setState(() {
-                          task.quantity--;
-                        });
-                      },
+            onPressed: _isReadOnly || task.quantity <= 0
+                ? null
+                : () {
+                    setState(() {
+                      task.quantity--;
+                      task.controller.text =
+                          '${task.quantity}';
+                    });
+                  },
           ),
 
+          // Direct numeric entry
           SizedBox(
-            width: 60,
-            child: Center(
-              child: Text(
-                '${task.quantity}',
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
+            width: 80,
+            height: 40,
+            child: _isReadOnly
+                ? Center(
+                    child: Text(
+                      '${task.quantity}',
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  )
+                : TextField(
+                    controller: task.controller,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(
+                      decimal: false,
+                      signed: false,
+                    ),
+                    inputFormatters: [
+                      FilteringTextInputFormatter
+                          .digitsOnly,
+                    ],
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    decoration: InputDecoration(
+                      contentPadding:
+                          const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 8,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.circular(6),
+                      ),
+                      enabledBorder:
+                          OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.circular(6),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFD1D5DB),
+                        ),
+                      ),
+                      focusedBorder:
+                          OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.circular(6),
+                        borderSide:
+                            const BorderSide(
+                          color: Colors.indigo,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                    onTap: () {
+                      final text =
+                          task.controller.text;
+
+                      task.controller.selection =
+                          TextSelection(
+                        baseOffset: 0,
+                        extentOffset: text.length,
+                      );
+                    },
+                    onChanged: (value) {
+                      final parsed =
+                          int.tryParse(value);
+
+                      setState(() {
+                        task.quantity =
+                            parsed ?? 0;
+                      });
+                    },
+                  ),
           ),
 
+          // Plus
           _buildCounterButton(
             icon: Icons.add,
             onPressed: _isReadOnly
@@ -541,6 +382,13 @@ class _DayEntryPageState extends State<DayEntryPage> {
                 : () {
                     setState(() {
                       task.quantity++;
+                      task.controller.text =
+                          '${task.quantity}';
+                      task.controller.selection =
+                          TextSelection.collapsed(
+                        offset:
+                            task.controller.text.length,
+                      );
                     });
                   },
           ),
@@ -559,12 +407,15 @@ class _DayEntryPageState extends State<DayEntryPage> {
       child: IconButton(
         onPressed: onPressed,
         icon: Icon(icon),
-        tooltip: icon == Icons.add
-            ? 'Add'
-            : 'Subtract',
+        tooltip:
+            icon == Icons.add ? 'Add' : 'Subtract',
       ),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Attendance
+  // ---------------------------------------------------------------------------
 
   Widget _buildAttendanceSection() {
     return _buildCard(
@@ -573,7 +424,11 @@ class _DayEntryPageState extends State<DayEntryPage> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            if (_isOnDuty) ...[
+            _buildDutyStatusDropdown(),
+
+            if (!_notRegularDuty) ...[
+              const Divider(height: 24),
+
               _buildTimeRow(
                 label: 'Time In',
                 value: _timeIn,
@@ -609,14 +464,11 @@ class _DayEntryPageState extends State<DayEntryPage> {
                 label: 'Undertime',
                 value: _undertimeMinutes,
               ),
-            ] else ...[
-              Text(
-                _statusDescription(),
-                style: TextStyle(
-                  fontSize: 15,
-                  color: Colors.grey.shade700,
-                ),
-              ),
+            ],
+
+            if (_notRegularDuty) ...[
+              const Divider(height: 24),
+              _buildReasonDropdown(),
             ],
           ],
         ),
@@ -624,27 +476,102 @@ class _DayEntryPageState extends State<DayEntryPage> {
     );
   }
 
-  String _statusDescription() {
-    switch (_status) {
-      case DailyAccomplishmentStatus.leave:
-        return 'No attendance time is required for leave.';
+  // ---------------------------------------------------------------------------
+  // Duty Status
+  // ---------------------------------------------------------------------------
 
-      case DailyAccomplishmentStatus.holiday:
-        return 'Non-working day.';
+  Widget _buildDutyStatusDropdown() {
+    return Row(
+      children: [
+        const Expanded(
+          child: Text(
+            'Absent / Not on Regular Duty?',
+            style: TextStyle(
+              fontSize: 15,
+            ),
+          ),
+        ),
+        DropdownButton<bool>(
+          value: _notRegularDuty,
+          items: const [
+            DropdownMenuItem(
+              value: false,
+              child: Text('No'),
+            ),
+            DropdownMenuItem(
+              value: true,
+              child: Text('Yes'),
+            ),
+          ],
+          onChanged: _isReadOnly
+              ? null
+              : (value) {
+                  if (value == null) return;
 
-      case DailyAccomplishmentStatus.travelOrder:
-        return 'Official travel / duty outside the regular workplace.';
+                  setState(() {
+                    _notRegularDuty = value;
 
-      case DailyAccomplishmentStatus.officialTraining:
-        return 'Official training, seminar, or workshop.';
-
-      case DailyAccomplishmentStatus.noAccomplishment:
-        return 'You are on duty, but there is no accomplishment to record.';
-
-      case DailyAccomplishmentStatus.accomplishment:
-        return '';
-    }
+                    if (!_notRegularDuty) {
+                      _dutyStatusReason = null;
+                    } else {
+                      _timeIn = null;
+                      _timeOut = null;
+                      _tardinessMinutes = 0;
+                      _undertimeMinutes = 0;
+                    }
+                  });
+                },
+        ),
+      ],
+    );
   }
+
+  // ---------------------------------------------------------------------------
+  // Duty Status Reason
+  // ---------------------------------------------------------------------------
+
+  Widget _buildReasonDropdown() {
+    const reasons = [
+      'Leave',
+      'Holiday / Non-Working Day',
+      'Travel Order',
+      'Official Training / Seminar / Workshop',
+    ];
+
+    return Row(
+      children: [
+        const Expanded(
+          child: Text(
+            'Reason',
+            style: TextStyle(
+              fontSize: 15,
+            ),
+          ),
+        ),
+        DropdownButton<String>(
+          value: _dutyStatusReason,
+          hint: const Text('Select'),
+          items: reasons.map((reason) {
+            return DropdownMenuItem<String>(
+              value: reason,
+              child: Text(reason),
+            );
+          }).toList(),
+          onChanged: _isReadOnly
+              ? null
+              : (value) {
+                  setState(() {
+                    _dutyStatusReason = value;
+                  });
+                },
+        ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Time Input
+  // ---------------------------------------------------------------------------
 
   Widget _buildTimeRow({
     required String label,
@@ -662,11 +589,8 @@ class _DayEntryPageState extends State<DayEntryPage> {
           ),
         ),
         TextButton.icon(
-          onPressed:
-              _isReadOnly ? null : onTap,
-          icon: const Icon(
-            Icons.access_time,
-          ),
+          onPressed: _isReadOnly ? null : onTap,
+          icon: const Icon(Icons.access_time),
           label: Text(
             value == null
                 ? 'Select time'
@@ -676,6 +600,10 @@ class _DayEntryPageState extends State<DayEntryPage> {
       ],
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Calculated Attendance Values
+  // ---------------------------------------------------------------------------
 
   Widget _buildCalculatedRow({
     required String label,
@@ -701,6 +629,10 @@ class _DayEntryPageState extends State<DayEntryPage> {
       ],
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Time Picker
+  // ---------------------------------------------------------------------------
 
   Future<void> _selectTime({
     required bool isTimeIn,
@@ -733,17 +665,21 @@ class _DayEntryPageState extends State<DayEntryPage> {
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // Automatic Tardiness / Undertime Calculation
+  // ---------------------------------------------------------------------------
+
   void _calculateAttendanceMinutes() {
-    if (!_isOnDuty) {
+    if (_notRegularDuty) {
       _tardinessMinutes = 0;
       _undertimeMinutes = 0;
       return;
     }
 
+    // Tardiness
     if (_timeIn != null) {
       final actualIn =
-          _timeIn!.hour * 60 +
-              _timeIn!.minute;
+          _timeIn!.hour * 60 + _timeIn!.minute;
 
       final officialStart =
           _officialStartTime.hour * 60 +
@@ -757,10 +693,10 @@ class _DayEntryPageState extends State<DayEntryPage> {
       _tardinessMinutes = 0;
     }
 
+    // Undertime
     if (_timeOut != null) {
       final actualOut =
-          _timeOut!.hour * 60 +
-              _timeOut!.minute;
+          _timeOut!.hour * 60 + _timeOut!.minute;
 
       final officialEnd =
           _officialEndTime.hour * 60 +
@@ -775,6 +711,10 @@ class _DayEntryPageState extends State<DayEntryPage> {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Card
+  // ---------------------------------------------------------------------------
+
   Widget _buildCard({
     required String title,
     required Widget child,
@@ -783,8 +723,7 @@ class _DayEntryPageState extends State<DayEntryPage> {
       width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius:
-            BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: const Color(0xFFE5E7EB),
         ),
@@ -815,6 +754,10 @@ class _DayEntryPageState extends State<DayEntryPage> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Action Buttons
+  // ---------------------------------------------------------------------------
+
   Widget _buildActionButtons() {
     if (_isReadOnly) {
       return Row(
@@ -841,9 +784,7 @@ class _DayEntryPageState extends State<DayEntryPage> {
           },
           child: const Text('Cancel'),
         ),
-
         const SizedBox(width: 12),
-
         FilledButton.icon(
           onPressed: _saveEntry,
           icon: const Icon(
@@ -855,110 +796,64 @@ class _DayEntryPageState extends State<DayEntryPage> {
     );
   }
 
-  Future<void> _saveEntry() async {
-    if (_status ==
-        DailyAccomplishmentStatus.leave) {
-      if (_leaveType == null) {
-        _showValidationMessage(
-          'Please select a leave type.',
-        );
-        return;
-      }
+  // ---------------------------------------------------------------------------
+  // Save
+  // ---------------------------------------------------------------------------
 
-      if (_leaveType == LeaveType.other &&
-          _leaveOtherController.text
-              .trim()
-              .isEmpty) {
-        _showValidationMessage(
-          'Please specify the other leave type.',
-        );
-        return;
+  Future<void> _saveEntry() async {
+    // Make sure the latest text in every field
+    // is reflected in the quantity values.
+    for (final task in _tasks) {
+      final parsed =
+          int.tryParse(task.controller.text);
+
+      task.quantity = parsed ?? 0;
+
+      if (task.quantity < 0) {
+        task.quantity = 0;
       }
     }
 
-    final bool notRegularDuty =
-        !_isOnDuty;
-
-    final String? dutyStatusReason =
-        _legacyDutyStatusReason();
-
-    final record =
-        DailyAccomplishmentRecord(
+    final record = DailyAccomplishmentRecord(
       date: widget.date,
 
-      status: _status,
-
-      leaveType: _leaveType,
-
-      leaveOtherReason:
-          _leaveType == LeaveType.other
-              ? _leaveOtherController.text.trim()
-              : null,
-
-      servedClients:
-          _tasks[0].quantity,
-
-      installValidatePin:
-          _tasks[1].quantity,
-
-      checkedPin:
-          _tasks[2].quantity,
-
+      // Accomplishment quantities
+      servedClients: _tasks[0].quantity,
+      installValidatePin: _tasks[1].quantity,
+      checkedPin: _tasks[2].quantity,
       updatePropertyIndexMaps:
           _tasks[3].quantity,
-
       updateTaxMapControlRolls:
           _tasks[4].quantity,
-
       updateMunicipalDigitalBaseMaps:
           _tasks[5].quantity,
-
       plotTechnicalDescription:
           _tasks[6].quantity,
-
       preparedDailyTimeRecord:
           _tasks[7].quantity,
+      submittedMpor: _tasks[8].quantity,
+      submittedIpcr: _tasks[9].quantity,
+      attendedMeetings: _tasks[10].quantity,
+      interveningTasks: _tasks[11].quantity,
 
-      submittedMpor:
-          _tasks[8].quantity,
+      // Duty status
+      notRegularDuty: _notRegularDuty,
+      dutyStatusReason: _dutyStatusReason,
 
-      submittedIpcr:
-          _tasks[9].quantity,
-
-      attendedMeetings:
-          _tasks[10].quantity,
-
-      interveningTasks:
-          _tasks[11].quantity,
-
-      notRegularDuty:
-          notRegularDuty,
-
-      dutyStatusReason:
-          dutyStatusReason,
-
-      timeIn:
-          _timeOfDayToDateTime(_timeIn),
-
-      timeOut:
-          _timeOfDayToDateTime(_timeOut),
-
-      tardinessMinutes:
-          _tardinessMinutes,
-
-      undertimeMinutes:
-          _undertimeMinutes,
+      // Attendance
+      timeIn: _timeOfDayToDateTime(_timeIn),
+      timeOut: _timeOfDayToDateTime(_timeOut),
+      tardinessMinutes: _tardinessMinutes,
+      undertimeMinutes: _undertimeMinutes,
     );
 
-    await dailyAccomplishmentRepository
-        .save(record);
+    await dailyAccomplishmentRepository.save(
+      record,
+    );
 
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
 
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text(
           'Daily accomplishment saved.',
@@ -967,42 +862,6 @@ class _DayEntryPageState extends State<DayEntryPage> {
     );
 
     Navigator.of(context).pop(true);
-  }
-
-  String? _legacyDutyStatusReason() {
-    switch (_status) {
-      case DailyAccomplishmentStatus
-          .accomplishment:
-        return null;
-
-      case DailyAccomplishmentStatus
-          .noAccomplishment:
-        return null;
-
-      case DailyAccomplishmentStatus.leave:
-        return 'Leave';
-
-      case DailyAccomplishmentStatus.holiday:
-        return 'Holiday / Non-Working Day';
-
-      case DailyAccomplishmentStatus.travelOrder:
-        return 'Travel Order';
-
-      case DailyAccomplishmentStatus
-          .officialTraining:
-        return 'Official Training / Seminar / Workshop';
-    }
-  }
-
-  void _showValidationMessage(
-    String message,
-  ) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
-      SnackBar(
-        content: Text(message),
-      ),
-    );
   }
 
   DateTime? _timeOfDayToDateTime(
@@ -1021,9 +880,11 @@ class _DayEntryPageState extends State<DayEntryPage> {
     );
   }
 
-  String _formattedDate(
-    DateTime date,
-  ) {
+  // ---------------------------------------------------------------------------
+  // Date Formatting
+  // ---------------------------------------------------------------------------
+
+  String _formattedDate(DateTime date) {
     const months = [
       'January',
       'February',
@@ -1044,8 +905,14 @@ class _DayEntryPageState extends State<DayEntryPage> {
   }
 }
 
+// -----------------------------------------------------------------------------
+// Task Entry Model
+// -----------------------------------------------------------------------------
+
 class _TaskEntry {
   final String name;
+  final TextEditingController controller =
+      TextEditingController();
 
   int quantity = 0;
 

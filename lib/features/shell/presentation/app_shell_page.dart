@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../dashboard/presentation/dashboard_page.dart';
 import '../../daily_accomplishment/presentation/daily_accomplishment_page.dart';
+import '../../monthly_reports/presentation/monthly_daily_accomplishment_page.dart';
 
 class AppShellPage extends StatefulWidget {
   const AppShellPage({super.key});
@@ -53,11 +54,8 @@ class _AppShellPageState extends State<AppShellPage> {
       child: Column(
         children: [
           const SizedBox(height: 24),
-
           _buildApplicationHeader(),
-
           const SizedBox(height: 28),
-
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -87,9 +85,7 @@ class _AppShellPageState extends State<AppShellPage> {
                   icon: Icons.fact_check_outlined,
                   label: 'IPCR',
                 ),
-
                 const Divider(height: 30),
-
                 _buildNavigationItem(
                   index: 5,
                   icon: Icons.task_alt_outlined,
@@ -103,9 +99,7 @@ class _AppShellPageState extends State<AppShellPage> {
               ],
             ),
           ),
-
           _buildExitButton(),
-
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: Text(
@@ -167,7 +161,8 @@ class _AppShellPageState extends State<AppShellPage> {
         color: Colors.transparent,
         child: ListTile(
           selected: selected,
-          selectedTileColor: Colors.indigo.withValues(alpha: 0.10),
+          selectedTileColor:
+              Colors.indigo.withValues(alpha: 0.10),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
@@ -275,10 +270,7 @@ class _AppShellPageState extends State<AppShellPage> {
         return const DailyAccomplishmentPage();
 
       case 2:
-        return const _ComingSoonPage(
-          title: 'Monthly Reports',
-          icon: Icons.description_outlined,
-        );
+        return const MonthlyDailyAccomplishmentPage();
 
       case 3:
         return const _ComingSoonPage(
