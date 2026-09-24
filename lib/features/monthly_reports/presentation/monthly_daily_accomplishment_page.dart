@@ -641,37 +641,52 @@ void _resetLayout() {
         12,
         6,
       ),
-      child: Row(
+      child: Column(
         children: [
-          const Expanded(
-            child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'DIVISION: TAX MAPPING OPERATIONS',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                SizedBox(height: 1),
-                Text(
-                  'Monthly Supervisor Summary',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.grey,
-                  ),
-                ),
-              ],
+          const Center(
+            child: Text(
+              'DAILY ACCOMPLISHMENT RECORD SHEET',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
-          Text(
-            _monthTitle(_displayedMonth).toUpperCase(),
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-            ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'DIVISION: TAX MAPPING OPERATIONS',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 1),
+                    Text(
+                      'Monthly Supervisor Summary',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            
+            Text(
+              _monthTitle(_displayedMonth).toUpperCase(),
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
         ],
       ),
